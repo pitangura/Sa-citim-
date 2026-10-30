@@ -1,0 +1,26 @@
+# Records the game's voice clips whenever the words or phrases change.
+name: Record voice clips
+on:
+  push:
+    branches: [main]
+    paths: ['data.js', 'tools/**', '.github/workflows/voice.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install edge-tts
+      - run: node tools/phrases.js > /tmp/phrases.json
+      - run: python tools/make_audio.py /tmp/phrases.json
+      - name: Commit clips
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audio
+          git diff --cached --quiet || (git commit -m "Record voice clips" && git push)

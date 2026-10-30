@@ -7,6 +7,9 @@ letters it moves on to words (short words first, then longer ones).
 
 - No account, no server. Progress is saved on the phone.
 - Works offline once opened, and can be added to the iPhone Home Screen.
+- The voice is pre-recorded (Microsoft "Alina" neural voice) by the GitHub workflow in
+  `.github/workflows/voice.yml` whenever `data.js` changes. Your own words from settings use the
+  phone's built-in voice.
 - The ⚙︎ button has settings for you: letters/words only, upper or lower case,
   voice speed, the example-word hint, and your own words (family names etc.).
 

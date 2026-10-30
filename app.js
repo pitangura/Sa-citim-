@@ -31,8 +31,17 @@ function save() {
 }
 
 // ---------- Voice ----------
+// Recorded clips (audio/, made by the GitHub workflow) sound much better than the phone's
+// built-in voice, so use them when they exist and fall back to speech synthesis otherwise.
 const synth = window.speechSynthesis;
+const player = new Audio();
+let clips = new Set();
 let roVoice = null;
+
+fetch('audio/index.json')
+  .then((r) => (r.ok ? r.json() : []))
+  .then((ids) => { clips = new Set(ids); updateVoiceStatus(); })
+  .catch(() => {});
 
 function pickVoice() {
   if (!synth) return;
@@ -47,52 +56,86 @@ if (synth) {
 
 function updateVoiceStatus() {
   const status = $('voiceStatus');
-  const warn = $('voiceWarning');
-  if (!synth) {
+  if (clips.size) {
+    status.textContent = `Voce înregistrată (${clips.size} fraze). Recorded voice is on.`;
+    $('voiceWarning').hidden = true;
+  } else if (!synth) {
     status.textContent = 'This browser cannot speak. Try Safari on the iPhone.';
-    return;
-  }
-  if (roVoice) {
+  } else if (roVoice) {
     status.textContent = `Voce: ${roVoice.name} (${roVoice.lang})`;
-    warn.hidden = true;
+    $('voiceWarning').hidden = true;
   } else {
     status.textContent = 'No Romanian voice found yet. On iPhone: Settings › Accessibility › Spoken Content › Voices › Romanian, then download “Ioana”.';
   }
 }
 // Voices load late on some devices, so only warn after giving them a moment.
 setTimeout(() => {
-  if (synth && !roVoice) {
+  if (!clips.size && synth && !roVoice) {
     const warn = $('voiceWarning');
     warn.textContent = 'Nu am găsit vocea română. / No Romanian voice found. On iPhone: Settings › Accessibility › Spoken Content › Voices › Romanian › Ioana.';
     warn.hidden = false;
   }
 }, 1500);
 
-let speakToken = 0;
-function speak(text) {
+function playClip(id) {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const done = (ok) => {
+      if (finished) return;
+      finished = true;
+      player.onended = player.onerror = player.onpause = null;
+      ok ? resolve() : reject();
+    };
+    player.onended = () => done(true);
+    player.onpause = () => done(true);   // stopped by a newer sentence
+    player.onerror = () => done(false);
+    player.src = `audio/${id}.mp3`;
+    player.playbackRate = Math.min(1.3, Math.max(0.6, (Number(state.settings.rate) || 0.85) / 0.85));
+    const p = player.play();
+    if (p) p.catch(() => done(false));
+    setTimeout(() => done(true), 12000);
+  });
+}
+
+function synthesize(text) {
   return new Promise((resolve) => {
     if (!synth) return resolve();
-    const token = ++speakToken;
-    synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ro-RO';
     if (roVoice) u.voice = roVoice;
     u.rate = Number(state.settings.rate) || 0.85;
-    const btn = $('repeatBtn');
     let finished = false;
-    const done = () => {
-      if (finished) return;
-      finished = true;
-      if (token === speakToken) btn.classList.remove('speaking');
-      resolve();
-    };
+    const done = () => { if (!finished) { finished = true; resolve(); } };
     u.onend = done;
     u.onerror = done;
-    btn.classList.add('speaking');
     synth.speak(u);
     // Safety net: some browsers never fire onend.
     setTimeout(done, 1500 + text.length * 140);
   });
+}
+
+function stopSpeaking() {
+  synth && synth.cancel();
+  if (!player.paused) player.pause();
+}
+
+// Say one or more sentences in order. A newer call interrupts an older one.
+let speakToken = 0;
+async function speak(...parts) {
+  const token = ++speakToken;
+  const btn = $('repeatBtn');
+  stopSpeaking();
+  btn.classList.add('speaking');
+  for (const text of parts) {
+    if (token !== speakToken) return;
+    const id = clipId(text);
+    if (clips.has(id)) {
+      try { await playClip(id); continue; } catch (e) { /* fall back to synthesis */ }
+    }
+    if (token !== speakToken) return;
+    await synthesize(text);
+  }
+  if (token === speakToken) btn.classList.remove('speaking');
 }
 
 // ---------- Gentle sounds ----------
@@ -210,16 +253,14 @@ function makeLetterQuestion() {
     if (distractors.size >= 3) break;
     if (c !== target) distractors.add(c);
   }
-  const prompt = state.settings.hint
-    ? `Unde este litera ${info.name}? ${info.name}, ca în ${info.ex}.`
-    : `Unde este litera ${info.name}?`;
+  const prompt = SAY.letterPrompt(info, state.settings.hint);
   return {
     kind: 'letter',
     key: target,
     options: shuffle([target, ...distractors]),
     prompt,
-    short: `Litera ${info.name}.`,
-    showMe: `Aceasta este litera ${info.name}. Apas-o.`,
+    short: SAY.letterShort(info),
+    showMe: SAY.letterShowMe(info),
     label: displayLetter,
     reward: displayLetter(target),
   };
@@ -240,9 +281,9 @@ function makeWordQuestion() {
     kind: 'word',
     key: target,
     options: shuffle([target, ...distractors]),
-    prompt: `Unde scrie: ${target}?`,
-    short: `${target}.`,
-    showMe: `Aici scrie ${target}. Apasă aici.`,
+    prompt: SAY.wordPrompt(target),
+    short: SAY.wordShort(target),
+    showMe: SAY.wordShowMe(target),
     label: displayWord,
     reward: emoji,
   };
@@ -307,7 +348,7 @@ async function answer(btn) {
     renderDots();
     const unlocked = progress();
     save();
-    await speak(mistakes === 0 ? rand(PRAISE) : 'Bine.');
+    await speak(mistakes === 0 ? rand(PRAISE) : SAY.ok);
     await wait(500);
     if (unlocked) await celebrateWords();
     nextQuestion();
@@ -330,7 +371,7 @@ async function answer(btn) {
     await speak(q.showMe);
   } else {
     busy = false;
-    await speak(`${rand(RETRY)} ${q.short}`);
+    await speak(rand(RETRY), q.short);
   }
 }
 
@@ -361,7 +402,7 @@ async function celebrateWords() {
   $('options').innerHTML = '';
   $('reward').textContent = '🎉';
   $('reward').classList.add('show');
-  await speak('Felicitări! Știi toate literele. Acum citim cuvinte!');
+  await speak(SAY.celebrate);
   await wait(600);
 }
 
@@ -375,14 +416,14 @@ function startRound() {
 function endRound() {
   showScreen('roundEnd');
   $('stars').textContent = '⭐'.repeat(Math.max(1, roundCorrect));
-  const msg = roundCorrect >= 8 ? 'Excelent!' : roundCorrect >= 5 ? 'Foarte bine!' : 'Bravo! Ai lucrat frumos.';
+  const msg = roundCorrect >= 8 ? SAY.roundGreat : roundCorrect >= 5 ? SAY.roundGood : SAY.roundOk;
   $('roundMsg').textContent = msg;
   speak(msg);
 }
 
 // ---------- Settings ----------
 function openSettings() {
-  synth && synth.cancel();
+  stopSpeaking();
   const st = state.settings;
   $('setMode').value = st.mode;
   $('setCase').value = st.case;
@@ -411,7 +452,7 @@ $('settings').addEventListener('close', () => {
   readSettings();
   if ($('game').classList.contains('active')) nextQuestion();
 });
-$('testVoice').addEventListener('click', () => { readSettings(); speak('Bună! Hai să citim împreună.'); });
+$('testVoice').addEventListener('click', () => { readSettings(); speak(SAY.test); });
 $('resetBtn').addEventListener('click', () => {
   if (!confirm('Ștergi tot progresul? / Reset all progress?')) return;
   const settings = state.settings;
@@ -429,7 +470,7 @@ $('startBtn').addEventListener('click', () => {
 });
 $('againBtn').addEventListener('click', startRound);
 $('doneBtn').addEventListener('click', () => {
-  speak('La revedere! Pe mâine.');
+  speak(SAY.bye);
   showScreen('start');
 });
 $('repeatBtn').addEventListener('click', () => { if (q) speak(q.prompt); });

@@ -61,3 +61,29 @@ const WORD_LEVELS = [
 
 const PRAISE = ['Bravo!', 'Foarte bine!', 'Excelent!', 'Așa este!', 'Minunat!', 'Perfect!'];
 const RETRY = ['Mai încearcă.', 'Aproape. Încă o dată.', 'Nu chiar. Mai încearcă.'];
+
+// Everything the game says. tools/phrases.js reads this to pre-record the voice clips,
+// so any sentence spoken in app.js should come from here.
+const SAY = {
+  letterPrompt: (l, hint) => hint ? `Unde este litera ${l.name}? ${l.name}, ca în ${l.ex}.` : `Unde este litera ${l.name}?`,
+  letterShort: (l) => `Litera ${l.name}.`,
+  letterShowMe: (l) => `Aceasta este litera ${l.name}. Apas-o.`,
+  wordPrompt: (w) => `Unde scrie: ${w}?`,
+  wordShort: (w) => `${w}.`,
+  wordShowMe: (w) => `Aici scrie ${w}. Apasă aici.`,
+  ok: 'Bine.',
+  celebrate: 'Felicitări! Știi toate literele. Acum citim cuvinte!',
+  roundGreat: 'Excelent!',
+  roundGood: 'Foarte bine!',
+  roundOk: 'Bravo! Ai lucrat frumos.',
+  bye: 'La revedere! Pe mâine.',
+  test: 'Bună! Hai să citim împreună.',
+};
+
+// Name of the recorded clip for a sentence (same function in tools/phrases.js).
+function clipId(text) {
+  const s = text.normalize('NFC');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
