@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Să citim!</title>
+  <meta name="theme-color" content="#2f6f5e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Să citim">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Start screen: the first tap also unlocks audio on iPhone -->
+  <section id="start" class="screen active">
+    <h1>Să citim!</h1>
+    <p class="sub">Ascultă și apasă pe răspuns.</p>
+    <button id="startBtn" class="big-btn">Începe ▶</button>
+    <p id="voiceWarning" class="warning" hidden></p>
+    <button class="gear" data-open-settings aria-label="Setări">⚙︎</button>
+  </section>
+
+  <!-- Game screen -->
+  <section id="game" class="screen">
+    <header class="top">
+      <div id="dots" class="dots" aria-hidden="true"></div>
+      <button class="gear" data-open-settings aria-label="Setări">⚙︎</button>
+    </header>
+    <div class="prompt">
+      <button id="repeatBtn" class="repeat" aria-label="Ascultă din nou">🔊</button>
+      <div id="promptText" class="prompt-text"></div>
+      <div id="reward" class="reward" aria-hidden="true"></div>
+    </div>
+    <div id="options" class="options"></div>
+  </section>
+
+  <!-- End of a round -->
+  <section id="roundEnd" class="screen">
+    <div class="stars" id="stars"></div>
+    <h2 id="roundMsg">Bravo!</h2>
+    <button id="againBtn" class="big-btn">Încă o rundă ▶</button>
+    <button id="doneBtn" class="big-btn secondary">Gata pentru azi</button>
+  </section>
+
+  <!-- Settings, mostly for the helper -->
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>Setări <small>Settings</small></h2>
+
+      <label>Ce exersăm <small>What to practise</small>
+        <select id="setMode">
+          <option value="auto">Automat (litere, apoi cuvinte)</option>
+          <option value="letters">Doar litere</option>
+          <option value="words">Doar cuvinte</option>
+        </select>
+      </label>
+
+      <label>Litere <small>Letter case</small>
+        <select id="setCase">
+          <option value="lower">mici (a b c)</option>
+          <option value="upper">MARI (A B C)</option>
+          <option value="both">ambele (Aa Bb)</option>
+        </select>
+      </label>
+
+      <label>Viteza vocii <small>Voice speed</small>
+        <input id="setRate" type="range" min="0.5" max="1.1" step="0.05">
+      </label>
+      <button type="button" id="testVoice" class="small-btn">Testează vocea / Test voice</button>
+      <p id="voiceStatus" class="note"></p>
+
+      <label class="check"><input id="setHint" type="checkbox"> Indiciu: „en, ca în nas” <small>Say an example word</small></label>
+
+      <label>Cuvintele noastre <small>Your own words, one per line (names, family…)</small>
+        <textarea id="setWords" rows="4" placeholder="Ana&#10;Mihai&#10;grădina"></textarea>
+      </label>
+
+      <p id="progressNote" class="note"></p>
+      <button type="button" id="resetBtn" class="small-btn danger">Șterge progresul / Reset progress</button>
+
+      <button value="close" class="big-btn">Înapoi</button>
+    </form>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
